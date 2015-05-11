@@ -3,6 +3,13 @@ import feedparser
 import re
 from datetime import datetime
 from urllib.request import urlretrieve
+from enum import Enum
+
+class TrustFilter(Enum):
+    ShowAll = 0
+    FilterRemakes = 1
+    TrustedOnly = 2
+    AOnly = 3
 
 class NyaaFile:
     title = ''
@@ -24,7 +31,7 @@ class NyaaFile:
         self.parse_published()
 
     def parse_title(self):
-        reg = r'\[(?P<group>[^\]]+)\]\s*(?P<title>.+?)[\s-]+.*?[\s-]*?(?:[Ss]?(?P<season>\d+)[\s-]+?)?(?P<episode>\d+)(?:-(?P<extra_episode>\d+))?\s*\[(?P<quality>[\d\w]+)\]'
+        reg = r'\[(?P<group>[^\]]+)\]\s*(?P<title>.+?)[\s-]+.*?[\s-]*?(?:[Ss]?(?P<season>\d+)[\s-]+?)?(?P<episode>\d+)(?:-(?P<extra_episode>\d+))?\s*(?:\[[^\]]*(?P<quality>(360|720|1080))[^\]]*\])?'
         matches = re.search(reg, self.file_title)
 
         if matches:
@@ -40,7 +47,7 @@ class NyaaFile:
         return str(self.__dict__)
 
 class NyaaClient:
-    base_path = 'http://www.nyaa.se/?page=rss&cats=1_37&filter=2&sort=2&term={term}'
+    base_path = 'http://www.nyaa.se/?page=rss&cats=1_37&filter={filter}&sort=2&term={term}'
     session = None
 
     def __init__(self):
@@ -50,8 +57,8 @@ class NyaaClient:
     def __getattr__(self, item):
         return self.search(item)
 
-    def search(self, term, group=None, episode=None, season=None, quality=None):
-        path = self.base_path.format(**{'term': term})
+    def search(self, term, group=None, episode=None, season=None, quality=None, trust_filter=TrustFilter.TrustedOnly):
+        path = self.base_path.format(**{'term': term, 'filter': trust_filter})
         status, body = self.request(path)
 
         if int(status) != 200:
@@ -74,7 +81,13 @@ class NyaaClient:
 
     def get_available_groups(self, term):
         items = self.search(term)
-        return list({item.group for item in items if item.group})
+        groups = {}
+        for item in items:
+            if item.group:
+                groups[item.group] = groups.get(item.group, [])
+                if item.quality and item.quality not in groups[item.group]:
+                    groups[item.group].append(item.quality)
+        return groups
 
     def request(self, path, data={}):
         res = self.session.get(path, data=data)
@@ -83,16 +96,10 @@ class NyaaClient:
     def parse_entries(self, entries):
         return [NyaaFile(e) for e in entries]
 
-
-def download(items):
-    for item in items:
-        if item.link and item.file_title:
-            urlretrieve(item.link, '.'.join((item.file_title, 'torrent')))
-            print(item.file_title)
-
-c = NyaaClient()
-r = c.search('jojo egypt', quality='720p')
-download(r)
-
-r = c.search('nisekoi', 'Commie', 0, 2)
-download(r)
+if __name__ == '__main__':
+    import sys
+    if len(sys.argv) > 1:
+        title = sys.argv[1]
+        c = NyaaClient()
+        r = c.get_available_groups(title)
+        print(r)
