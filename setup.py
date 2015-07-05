@@ -1,6 +1,6 @@
 from distutils.core import setup
 
-setup(name='nyaa',
+setup(name='NyaPythonClient',
     version='0.1',
     py_modules=['nyaa']
 )
