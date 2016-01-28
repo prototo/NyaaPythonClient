@@ -1,7 +1,10 @@
-from distutils.core import setup
+from distutils.core import setup, find_packages
 
-setup(name='nyaa_client',
-    version='0.0.0',
+
+setup(
+    name='nyaa-python-client',
+    version='0.1.0',
     license='MIT',
-    py_modules=['nyaa_client']
+    keywords='nyaa anime torrent',
+    packages=find_packages()
 )
